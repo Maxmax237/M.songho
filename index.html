@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Songho Online - TCHOMKEM MARCEL</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(145deg, #2d5a2c 0%, #1a3a18 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+        }
+
+        .game-wrapper {
+            background: #b5713c;
+            border-radius: 90px 90px 70px 70px;
+            padding: 30px 25px 25px 25px;
+            box-shadow: 0 25px 35px rgba(0,0,0,0.5), inset 0 2px 6px rgba(255,240,180,0.6);
+            border-bottom: 5px solid #7a4a28;
+        }
+
+        .board {
+            background: #e2be8c;
+            border-radius: 50px;
+            padding: 22px 18px;
+            box-shadow: inset 0 0 0 3px #faf0dd, inset 0 0 0 8px #c9985e;
+        }
+
+        .player-zone {
+            margin: 10px 0;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 0 15px 10px 15px;
+            font-weight: bold;
+        }
+
+        .player-title {
+            background: #2e241a;
+            padding: 6px 28px;
+            border-radius: 40px;
+            color: #f7e5b5;
+            letter-spacing: 1.5px;
+            font-size: 1rem;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .player-score {
+            background: #1f1912;
+            padding: 5px 20px;
+            border-radius: 35px;
+            color: #ffdd99;
+            font-size: 1.3rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .cells-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 8px;
+        }
+
+        .pit {
+            width: 82px;
+            height: 92px;
+            background: radial-gradient(circle at 35% 30%, #fff2e2, #fae1bd);
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 7px 10px rgba(0,0,0,0.25), inset 0 -2px 0 #bc8552;
+            border: 1px solid #f2dcb0;
+        }
+
+        .pit.active {
+            background: radial-gradient(circle at 35% 30%, #ffefc0, #ffdd9e);
+            box-shadow: 0 0 0 3px #f7bc6c, 0 5px 12px black;
+            transform: scale(1.01);
+            cursor: pointer;
+        }
+
+        .pit.disabled {
+            filter: brightness(0.8) grayscale(0.25);
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .pit.waiting {
+            cursor: wait;
+            opacity: 0.6;
+        }
+
+        .pit-count {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #3f2a14;
+            font-family: 'Courier New', monospace;
+        }
+
+        .pit-seeds {
+            font-size: 0.9rem;
+            color: #bc6f2c;
+            letter-spacing: 2px;
+            font-weight: 500;
+        }
+
+        .pit:active {
+            transform: scale(0.96);
+        }
+
+        .info-bar {
+            margin-top: 22px;
+            background: #2a241ccc;
+            backdrop-filter: blur(5px);
+            border-radius: 55px;
+            padding: 10px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            color: #f5efda;
+            font-weight: bold;
+        }
+
+        .turn-box {
+            background: #4d351f;
+            padding: 6px 26px;
+            border-radius: 40px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            box-shadow: inset 0 1px 0 #be9468, 0 2px 5px black;
+        }
+
+        .game-msg {
+            background: #000000aa;
+            padding: 6px 20px;
+            border-radius: 30px;
+            max-width: 300px;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        .reset-btn {
+            background: #d68f3c;
+            border: none;
+            padding: 7px 26px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.07s linear;
+            color: #291b0d;
+            box-shadow: 0 3px 0 #6b401c;
+            font-family: inherit;
+        }
+
+        .reset-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #6b401c;
+        }
+
+        .name-input-container {
+            background: #2e241a;
+            padding: 10px 20px;
+            border-radius: 50px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .name-input-container input {
+            padding: 8px 15px;
+            border-radius: 30px;
+            border: none;
+            font-size: 14px;
+            background: #f5e6d3;
+            color: #2e241a;
+        }
+
+        .waiting-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            flex-direction: column;
+        }
+
+        .waiting-content {
+            background: #b5713c;
+            padding: 40px;
+            border-radius: 60px;
+            text-align: center;
+            color: white;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 680px) {
+            .pit {
+                width: 58px;
+                height: 72px;
+            }
+            .pit-count {
+                font-size: 1.7rem;
+            }
+            .player-title {
+                font-size: 0.75rem;
+                padding: 4px 12px;
+            }
+            .cells-row {
+                gap: 8px;
+            }
+        }
+
+        .custom-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="waitingScreen" class="waiting-screen" style="display: none;">
+        <div class="waiting-content">
+            <h2>Recherche d'adversaire...</h2>
+            <div class="spinner"></div>
+            <button id="cancelSearch" style="margin-top: 20px; background: #d68f3c; border: none; padding: 10px 30px; border-radius: 50px; cursor: pointer;">Annuler</button>
+        </div>
+    </div>
+
+    <div>
+        <div class="game-wrapper">
+            <div class="name-input-container">
+                <span style="color: white;">Votre pseudo:</span>
+                <input type="text" id="playerName" placeholder="Entrez votre nom" maxlength="20">
+                <button id="setNameBtn" class="reset-btn" style="padding: 6px 20px;">OK</button>
+            </div>
+
+            <div class="board">
+                <div class="player-zone">
+                    <div class="player-header">
+                        <span class="player-title" id="northTitle">NORD - EN ATTENTE</span>
+                        <span class="player-score" id="score-north">0</span>
+                    </div>
+                    <div class="cells-row" id="north-pits"></div>
+                </div>
+
+                <div class="player-zone">
+                    <div class="player-header">
+                        <span class="player-title" id="southTitle">SUD - EN ATTENTE</span>
+                        <span class="player-score" id="score-south">0</span>
+                    </div>
+                    <div class="cells-row" id="south-pits"></div>
+                </div>
+            </div>
+
+            <div class="info-bar">
+                <div class="turn-box" id="turn-indicator">EN ATTENTE</div>
+                <div class="game-msg" id="message-area">Connectez-vous et trouvez une partie</div>
+                <button id="find-game-btn" class="reset-btn">TROUVER UNE PARTIE</button>
+                <button id="reset-btn" style="display: none;" class="reset-btn">NOUVELLE PARTIE</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="custom-footer">
+        TCHOMKEM MARCEL - Matricule : 22U2021 - Version Multijoueur en Ligne
+    </footer>
+
+    <script>
+        let socket = null;
+        let roomId = null;
+        let myRole = null;
+        let gameState = null;
+        let gameActive = false;
+        let myTurn = false;
+        let playerName = localStorage.getItem('songhoName') || '';
+
+        // DOM elements
+        const northPitsDiv = document.getElementById("north-pits");
+        const southPitsDiv = document.getElementById("south-pits");
+        const northScoreSpan = document.getElementById("score-north");
+        const southScoreSpan = document.getElementById("score-south");
+        const turnSpan = document.getElementById("turn-indicator");
+        const messageSpan = document.getElementById("message-area");
+        const findGameBtn = document.getElementById("find-game-btn");
+        const resetBtn = document.getElementById("reset-btn");
+        const waitingScreen = document.getElementById("waitingScreen");
+        const cancelSearchBtn = document.getElementById("cancelSearch");
+        const playerNameInput = document.getElementById("playerName");
+        const setNameBtn = document.getElementById("setNameBtn");
+        const northTitle = document.getElementById("northTitle");
+        const southTitle = document.getElementById("southTitle");
+
+        // Initialiser le nom
+        if (playerName) {
+            playerNameInput.value = playerName;
+        }
+
+        function updateMessage(msg, isError = false) {
+            messageSpan.textContent = msg;
+            messageSpan.style.backgroundColor = isError ? "#991111cc" : "#000000aa";
+            setTimeout(() => {
+                if (messageSpan.textContent === msg && !isError) {
+                    messageSpan.style.backgroundColor = "#000000aa";
+                }
+            }, 2000);
+        }
+
+        function getNextPosition(player, idx) {
+            if (player === "south") {
+                if (idx + 1 < 6) return { player: "south", index: idx + 1 };
+                else return { player: "north", index: 0 };
+            } else {
+                if (idx + 1 < 6) return { player: "north", index: idx + 1 };
+                else return { player: "south", index: 0 };
+            }
+        }
+
+        function executeMoveLogic(state, player, startIdx) {
+            let seeds;
+            if (player === "south") {
+                seeds = state.southPits[startIdx];
+                if (seeds === 0) return false;
+                state.southPits[startIdx] = 0;
+            } else {
+                seeds = state.northPits[startIdx];
+                if (seeds === 0) return false;
+                state.northPits[startIdx] = 0;
+            }
+
+            let pos = { player: player, index: startIdx };
+            let first = true;
+            let remaining = seeds;
+            let lastPos = null;
+
+            while (remaining > 0) {
+                if (first) {
+                    pos = getNextPosition(pos.player, pos.index);
+                    first = false;
+                } else {
+                    pos = getNextPosition(pos.player, pos.index);
+                }
+                if (pos.player === "south") state.southPits[pos.index]++;
+                else state.northPits[pos.index]++;
+                remaining--;
+                lastPos = { player: pos.player, index: pos.index };
+            }
+
+            if (!lastPos) return false;
+
+            let replayTurn = false;
+            let captured = false;
+
+            if (lastPos.player !== player) {
+                let targetPits = (lastPos.player === "south") ? state.southPits : state.northPits;
+                let countAfter = targetPits[lastPos.index];
+                if (countAfter === 2 || countAfter === 3) {
+                    if (player === "south") state.southStore += countAfter;
+                    else state.northStore += countAfter;
+                    targetPits[lastPos.index] = 0;
+                    captured = true;
+                }
+            }
+
+            if (!captured && lastPos.player === player) {
+                let ownPits = (player === "south") ? state.southPits : state.northPits;
+                if (ownPits[lastPos.index] > 1) {
+                    replayTurn = true;
+                }
+            }
+
+            if (!replayTurn) {
+                state.currentTurn = state.currentTurn === "south" ? "north" : "south";
+            }
+
+            const southTotal = state.southPits.reduce((a,b) => a+b, 0);
+            const northTotal = state.northPits.reduce((a,b) => a+b, 0);
+
+            if (southTotal === 0 || northTotal === 0) {
+                state.gameActive = false;
+                state.gameFinished = true;
+                if (southTotal === 0 && northTotal > 0) {
+                    state.northStore += northTotal;
+                    for (let i = 0; i < state.northPits.length; i++) state.northPits[i] = 0;
+                } else if (northTotal === 0 && southTotal > 0) {
+                    state.southStore += southTotal;
+                    for (let i = 0; i < state.southPits.length; i++) state.southPits[i] = 0;
+                }
+            }
+
+            return true;
+        }
+
+        function renderBoard() {
+            if (!gameState) return;
+
+            northScoreSpan.textContent = gameState.northStore;
+            southScoreSpan.textContent = gameState.southStore;
+
+            // Cases Nord
+            northPitsDiv.innerHTML = "";
+            for (let i = 0; i < gameState.northPits.length; i++) {
+                const val = gameState.northPits[i];
+                const cell = document.createElement("div");
+                cell.className = "pit";
+                
+                const isActive = gameActive && !gameState.gameFinished && myTurn && myRole === "north" && val > 0;
+                
+                if (isActive) {
+                    cell.classList.add("active");
+                } else if (!gameActive || gameState.gameFinished) {
+                    cell.classList.add("disabled");
+                } else if (!myTurn || myRole !== "north") {
+                    cell.classList.add("disabled");
+                }
+                
+                const countSpan = document.createElement("div");
+                countSpan.className = "pit-count";
+                countSpan.textContent = val;
+                const seedSpan = document.createElement("div");
+                seedSpan.className = "pit-seeds";
+                const dots = Math.min(val, 10);
+                seedSpan.textContent = "•".repeat(dots);
+                cell.appendChild(countSpan);
+                cell.appendChild(seedSpan);
+                cell.dataset.index = i;
+                
+                if (isActive) {
+                    cell.addEventListener("click", () => makeMove("north", i));
+                }
+                
+                northPitsDiv.appendChild(cell);
+            }
+
+            // Cases Sud
+            southPitsDiv.innerHTML = "";
+            for (let i = 0; i < gameState.southPits.length; i++) {
+                const val = gameState.southPits[i];
+                const cell = document.createElement("div");
+                cell.className = "pit";
+                
+                const isActive = gameActive && !gameState.gameFinished && myTurn && myRole === "south" && val > 0;
+                
+                if (isActive) {
+                    cell.classList.add("active");
+                } else if (!gameActive || gameState.gameFinished) {
+                    cell.classList.add("disabled");
+                } else if (!myTurn || myRole !== "south") {
+                    cell.classList.add("disabled");
+                }
+                
+                const countSpan = document.createElement("div");
+                countSpan.className = "pit-count";
+                countSpan.textContent = val;
+                const seedSpan = document.createElement("div");
+                seedSpan.className = "pit-seeds";
+                const dots = Math.min(val, 10);
+                seedSpan.textContent = "•".repeat(dots);
+                cell.appendChild(countSpan);
+                cell.appendChild(seedSpan);
+                cell.dataset.index = i;
+                
+                if (isActive) {
+                    cell.addEventListener("click", () => makeMove("south", i));
+                }
+                
+                southPitsDiv.appendChild(cell);
+            }
+
+            if (!gameState.gameFinished) {
+                turnSpan.textContent = gameState.currentTurn === "south" ? "TOUR : SUD" : "TOUR : NORD";
+            }
+        }
+
+        function makeMove(player, pitIndex) {
+            if (!gameActive || gameState.gameFinished || !myTurn || myRole !== player) return;
+            
+            const newState = JSON.parse(JSON.stringify(gameState));
+            const success = executeMoveLogic(newState, player, pitIndex);
+            
+            if (success) {
+                socket.emit('make-move', {
+                    roomId: roomId,
+                    player: player,
+                    pitIndex: pitIndex,
+                    gameState: newState
+                });
+                myTurn = false;
+                renderBoard();
+                updateMessage("Mouvement envoyé, attente de l'adversaire...");
+            } else {
+                updateMessage("Mouvement invalide", true);
+            }
+        }
+
+        function connectToServer() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Connecté au serveur');
+                if (playerName) {
+                    socket.emit('set-name', playerName);
+                }
+                updateMessage('Connecté ! Cliquez pour trouver une partie');
+            });
+            
+            socket.on('waiting', (msg) => {
+                waitingScreen.style.display = 'flex';
+                updateMessage(msg);
+            });
+            
+            socket.on('game-found', (data) => {
+                roomId = data.roomId;
+                myRole = data.players[socket.id].role;
+                waitingScreen.style.display = 'none';
+                
+                const opponent = Object.values(data.players).find(p => p.role !== myRole);
+                const myName = data.players[socket.id].name;
+                const oppName = opponent?.name || 'Adversaire';
+                
+                if (myRole === 'south') {
+                    southTitle.textContent = `SUD - ${myName} (VOUS)`;
+                    northTitle.textContent = `NORD - ${oppName}`;
+                } else {
+                    northTitle.textContent = `NORD - ${myName} (VOUS)`;
+                    southTitle.textContent = `SUD - ${oppName}`;
+                }
+                
+                updateMessage(`Partie trouvée ! Vous êtes ${myRole === 'south' ? 'Sud' : 'Nord'}. En attente...`);
+                socket.emit('player-ready', roomId);
+            });
+            
+            socket.on('opponent-waiting', (msg) => {
+                updateMessage(msg);
+            });
+            
+            socket.on('game-start', (data) => {
+                gameState = data.gameState;
+                gameActive = true;
+                myTurn = (myRole === gameState.currentTurn);
+                renderBoard();
+                updateMessage(myTurn ? 'La partie commence ! À vous de jouer' : 'La partie commence ! Tour de l\'adversaire');
+                findGameBtn.style.display = 'none';
+                resetBtn.style.display = 'inline-block';
+            });
+            
+            socket.on('game-update', (data) => {
+                gameState = data.gameState;
+                myTurn = (myRole === gameState.currentTurn);
+                renderBoard();
+                
+                if (!gameState.gameFinished) {
+                    updateMessage(myTurn ? 'À vous de jouer' : 'Tour de l\'adversaire');
+                }
+            });
+            
+            socket.on('game-over', (data) => {
+                gameActive = false;
+                let winnerMsg = '';
+                if (data.winner === 'south') {
+                    winnerMsg = myRole === 'south' ? '🎉 VOUS AVEZ GAGNÉ ! 🎉' : '😔 L\'ADVERSAIRE A GAGNÉ 😔';
+                } else if (data.winner === 'north') {
+                    winnerMsg = myRole === 'north' ? '🎉 VOUS AVEZ GAGNÉ ! 🎉' : '😔 L\'ADVERSAIRE A GAGNÉ 😔';
+                } else {
+                    winnerMsg = '🤝 MATCH NUL ! 🤝';
+                }
+                updateMessage(`${winnerMsg} Score: Sud ${data.scores.south} - Nord ${data.scores.north}`);
+                turnSpan.textContent = winnerMsg;
+                findGameBtn.style.display = 'inline-block';
+                resetBtn.style.display = 'none';
+            });
+            
+            socket.on('opponent-left', (msg) => {
+                updateMessage(msg, true);
+                gameActive = false;
+                myTurn = false;
+                findGameBtn.style.display = 'inline-block';
+                resetBtn.style.display = 'none';
+                northTitle.textContent = 'NORD - EN ATTENTE';
+                southTitle.textContent = 'SUD - EN ATTENTE';
+            });
+            
+            socket.on('error', (msg) => {
+                updateMessage(msg, true);
+                waitingScreen.style.display = 'none';
+            });
+        }
+
+        function findGame() {
+            if (!playerName) {
+                updateMessage("Veuillez entrer votre pseudo d'abord", true);
+                return;
+            }
+            if (socket) {
+                socket.emit('find-game');
+                findGameBtn.disabled = true;
+                findGameBtn.textContent = "RECHERCHE...";
+                setTimeout(() => {
+                    findGameBtn.disabled = false;
+                    findGameBtn.textContent = "TROUVER UNE PARTIE";
+                }, 5000);
+            }
+        }
+
+        function resetGame() {
+            if (socket && roomId) {
+                socket.emit('leave-game', roomId);
+                roomId = null;
+                myRole = null;
+                gameState = null;
+                gameActive = false;
+                myTurn = false;
+                findGameBtn.style.display = 'inline-block';
+                resetBtn.style.display = 'none';
+                northTitle.textContent = 'NORD - EN ATTENTE';
+                southTitle.textContent = 'SUD - EN ATTENTE';
+                updateMessage("Recherche d'une nouvelle partie...");
+                findGame();
+            }
+        }
+
+        function cancelSearch() {
+            waitingScreen.style.display = 'none';
+            if (socket) {
+                socket.emit('leave-game', 'waiting');
+            }
+            findGameBtn.disabled = false;
+            findGameBtn.textContent = "TROUVER UNE PARTIE";
+            updateMessage("Recherche annulée");
+        }
+
+        function setPlayerName() {
+            const newName = playerNameInput.value.trim();
+            if (newName) {
+                playerName = newName;
+                localStorage.setItem('songhoName', playerName);
+                if (socket) {
+                    socket.emit('set-name', playerName);
+                }
+                updateMessage(`Pseudo enregistré: ${playerName}`);
+            } else {
+                updateMessage("Veuillez entrer un pseudo valide", true);
+            }
+        }
+
+        // Événements
+        findGameBtn.addEventListener('click', findGame);
+        resetBtn.addEventListener('click', resetGame);
+        cancelSearchBtn.addEventListener('click', cancelSearch);
+        setNameBtn.addEventListener('click', setPlayerName);
+        playerNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') setPlayerName();
+        });
+
+        // Initialisation
+        connectToServer();
+    </script>
+</body>
+</html>
